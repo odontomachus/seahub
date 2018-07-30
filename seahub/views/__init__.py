@@ -708,7 +708,7 @@ def libraries(request):
 
     return render(request, 'libraries.html', {
             "allow_public_share": allow_public_share,
-            "guide_enabled": guide_enabled,
+            "guide_enabled": False,  # disable welcome popup window
             "sub_lib_enabled": sub_lib_enabled,
             'enable_wiki': settings.ENABLE_WIKI,
             'enable_upload_folder': settings.ENABLE_UPLOAD_FOLDER,
@@ -1168,4 +1168,10 @@ def choose_register(request):
 
     return render(request, 'choose_register.html', {
         'login_bg_image_path': login_bg_image_path
+    })
+
+
+def social_error(request):
+    return render(request, 'error.html', {
+        'error_msg': 'Failed to login, try again later.'
     })
