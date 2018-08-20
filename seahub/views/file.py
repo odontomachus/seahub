@@ -69,7 +69,7 @@ from seahub.utils.file_op import check_file_lock, \
         ONLINE_OFFICE_LOCK_OWNER, if_locked_by_online_office
 from seahub.views import check_folder_permission, \
         get_unencry_rw_repos_by_user
-from seahub.utils.repo import is_repo_owner
+from seahub.utils.repo import is_repo_owner, parse_repo_perm
 from seahub.group.utils import is_group_member
 
 from seahub.constants import HASH_URLS
@@ -1242,7 +1242,8 @@ def file_edit_submit(request, repo_id):
     parent_dir = os.path.dirname(path)
 
     # edit file, so check parent_dir's permission
-    if check_folder_permission(request, repo_id, parent_dir) != 'rw':
+    if parse_repo_perm(check_folder_permission(
+            request, repo_id, parent_dir)).can_edit_on_web is False:
         return error_json(_(u'Permission denied'))
 
     try:
@@ -1344,7 +1345,8 @@ def file_edit(request, repo_id):
     filename = urllib2.quote(u_filename.encode('utf-8'))
     parent_dir = os.path.dirname(path)
 
-    if check_folder_permission(request, repo.id, parent_dir) != 'rw':
+    if parse_repo_perm(check_folder_permission(
+            request, repo.id, parent_dir)).can_edit_on_web is False:
         return render_permission_error(request, _(u'Unable to edit file'))
 
     head_id = repo.head_cmmt_id
@@ -1494,7 +1496,8 @@ def download_file(request, repo_id, obj_id):
     # only check the permissions at the repo level
     # to prevent file can not be downloaded on the history page
     # if it has been renamed
-    if check_folder_permission(request, repo_id, '/'):
+    if parse_repo_perm(check_folder_permission(
+            request, repo_id, '/')).can_download is True:
         # Get a token to access file
         token = seafile_api.get_fileserver_access_token(repo_id,
                 obj_id, 'download', username)
@@ -1527,8 +1530,8 @@ def get_file_content_by_commit_and_path(request, repo_id, commit_id, path, file_
     if not obj_id or obj_id == EMPTY_SHA1:
         return '', None
     else:
-        permission = check_folder_permission(request, repo_id, '/')
-        if permission:
+        if parse_repo_perm(check_folder_permission(
+                request, repo_id, '/')).can_download is True:
             # Get a token to visit file
             token = seafile_api.get_fileserver_access_token(repo_id,
                     obj_id, 'view', request.user.username)

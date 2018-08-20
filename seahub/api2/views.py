@@ -75,7 +75,7 @@ from seahub.utils.devices import do_unlink_device
 from seahub.utils.repo import get_repo_owner, get_library_storages, \
         get_locked_files_by_dir, get_related_users_by_repo, \
         is_valid_repo_id_format, can_set_folder_perm_by_user, \
-        add_encrypted_repo_secret_key_to_database
+        add_encrypted_repo_secret_key_to_database, get_available_repo_perms
 from seahub.utils.star import star_file, unstar_file
 from seahub.utils.file_types import DOCUMENT
 from seahub.utils.file_size import get_file_size_unit
@@ -3958,9 +3958,9 @@ class SharedRepo(APIView):
         group_id = request.GET.get('group_id')
         permission = request.GET.get('permission')
 
-        if permission != 'rw' and permission != "r":
-            return api_error(status.HTTP_400_BAD_REQUEST,
-                             'Permission need to be rw or r.')
+        if permission not in get_available_repo_perms():
+            error_msg = 'permission invalid.'
+            return api_error(status.HTTP_400_BAD_REQUEST, error_msg)
 
         if share_type == 'personal':
             from_email = seafile_api.get_repo_owner(repo_id)
@@ -4386,7 +4386,7 @@ class GroupRepos(APIView):
                              'NOT allow to create encrypted library.')
 
         permission = request.data.get("permission", 'r')
-        if permission != 'r' and permission != 'rw':
+        if permission not in get_available_repo_perms():
             return api_error(status.HTTP_400_BAD_REQUEST, 'Invalid permission')
 
         org_id = -1

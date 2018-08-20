@@ -45,7 +45,7 @@ from seahub.utils import render_permission_error, render_error, \
     is_pro_version, FILE_AUDIT_ENABLED, is_valid_dirent_name, \
     is_org_repo_creation_allowed, is_windows_operating_system
 from seahub.utils.star import get_dir_starred_files
-from seahub.utils.repo import get_library_storages
+from seahub.utils.repo import get_library_storages, parse_repo_perm
 from seahub.utils.file_op import check_file_lock
 from seahub.utils.timeutils import utc_to_local
 from seahub.utils.auth import get_login_bg_image_path
@@ -911,7 +911,8 @@ def repo_download_dir(request, repo_id):
     else:
         dirname = repo.name
 
-    allow_download = True if check_folder_permission(request, repo_id, '/') else False
+    allow_download = parse_repo_perm(check_folder_permission(
+        request, repo_id, '/')).can_download
 
     if allow_download:
 

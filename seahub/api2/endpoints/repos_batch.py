@@ -28,7 +28,7 @@ from seahub.share.signals import share_repo_to_user_successful, \
 from seahub.utils import is_org_context, send_perm_audit_msg, \
         normalize_dir_path, get_folder_permission_recursively, \
         normalize_file_path, check_filename_with_rename
-from seahub.utils.repo import get_repo_owner
+from seahub.utils.repo import get_repo_owner, get_available_repo_perms
 
 from seahub.views import check_folder_permission
 from seahub.settings import MAX_PATH
@@ -147,7 +147,7 @@ class ReposBatchView(APIView):
                 return api_error(status.HTTP_400_BAD_REQUEST, error_msg)
 
             permission = request.data.get('permission', 'rw')
-            if permission not in [PERMISSION_READ, PERMISSION_READ_WRITE, PERMISSION_ADMIN]:
+            if permission not in get_available_repo_perms():
                 error_msg = 'permission invalid.'
                 return api_error(status.HTTP_400_BAD_REQUEST, error_msg)
 
