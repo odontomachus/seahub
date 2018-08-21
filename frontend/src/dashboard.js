@@ -9,6 +9,7 @@ import Notification from './components/Notification';
 import { SeafileAPI } from './seafile-api';
 import 'seafile-ui';
 import cookie from 'react-cookies';
+import './css/dashboard.css';
 
 const siteRoot = window.app.config.siteRoot;
 
@@ -34,7 +35,7 @@ class DashBoard extends Component {
     return (
       <div id="main">
           <SidePanel  isOpen={this.state.isOpen}
-                      toggleClose={this.isOpen} 
+                      toggleClose={this.isOpen}
                       seafileAPI={seafileAPI}/>
           <MainPanel isOpen={this.isOpen} seafileAPI={seafileAPI} >
             <Notification  seafileAPI={seafileAPI} />
