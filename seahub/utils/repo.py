@@ -19,8 +19,12 @@ from seahub.settings import ENABLE_STORAGE_CLASSES, \
 logger = logging.getLogger(__name__)
 
 def get_available_repo_perms():
-    return [PERMISSION_PREVIEW, PERMISSION_PREVIEW_EDIT,
-            PERMISSION_READ, PERMISSION_READ_WRITE, PERMISSION_ADMIN]
+    perms = [PERMISSION_READ, PERMISSION_READ_WRITE, PERMISSION_ADMIN]
+    if is_pro_version():
+        perms += [PERMISSION_PREVIEW, PERMISSION_PREVIEW_EDIT]
+
+    return perms
+
 
 def parse_repo_perm(perm):
     RP = namedtuple('RepoPerm', [

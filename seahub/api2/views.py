@@ -33,7 +33,7 @@ from .throttling import ScopedRateThrottle, AnonRateThrottle, UserRateThrottle
 from .authentication import TokenAuthentication
 from .serializers import AuthTokenSerializer
 from .utils import get_diff_details, \
-    api_error, get_file_size, prepare_starred_files, \
+    api_error, get_file_size, prepare_starred_files, is_web_request, \
     get_groups, api_group_check, get_timestamp, json_response, is_seafile_pro
 
 from seahub.wopi.utils import get_wopi_dict
@@ -689,6 +689,7 @@ class Repos(APIView):
             else:
                 shared_repos = seafile_api.get_share_in_repo_list(
                         email, -1, -1)
+
             repos_with_admin_share_to = ExtraSharePermission.objects.\
                     get_repos_with_admin_permission(email)
 
@@ -705,6 +706,10 @@ class Repos(APIView):
             for r in shared_repos:
                 if q and q.lower() not in r.name.lower():
                     continue
+
+                if parse_repo_perm(r.permission).can_download is False:
+                    if not is_web_request(request):
+                        continue
 
                 r.password_need = is_passwd_set(r.repo_id, email)
                 repo = {
@@ -759,6 +764,10 @@ class Repos(APIView):
             for r in group_repos:
                 if q and q.lower() not in r.name.lower():
                     continue
+
+                if parse_repo_perm(r.permission).can_download is False:
+                    if not is_web_request(request):
+                        continue
 
                 repo = {
                     "type": "grepo",
@@ -5090,7 +5099,7 @@ class RepoUserFolderPerm(APIView):
             return api_error(status.HTTP_400_BAD_REQUEST, error_msg)
 
         perm = request.data.get('permission', None)
-        if not perm or perm not in ('r', 'rw'):
+        if not perm or perm not in get_available_repo_perms():
             error_msg = 'permission invalid.'
             return api_error(status.HTTP_400_BAD_REQUEST, error_msg)
 
@@ -5178,7 +5187,7 @@ class RepoUserFolderPerm(APIView):
             return api_error(status.HTTP_400_BAD_REQUEST, error_msg)
 
         perm = request.data.get('permission', None)
-        if not perm or perm not in ('r', 'rw'):
+        if not perm or perm not in get_available_repo_perms():
             error_msg = 'permission invalid.'
             return api_error(status.HTTP_400_BAD_REQUEST, error_msg)
 
@@ -5365,7 +5374,7 @@ class RepoGroupFolderPerm(APIView):
             return api_error(status.HTTP_400_BAD_REQUEST, error_msg)
 
         perm = request.data.get('permission', None)
-        if not perm or perm not in ('r', 'rw'):
+        if not perm or perm not in get_available_repo_perms():
             error_msg = 'permission invalid.'
             return api_error(status.HTTP_400_BAD_REQUEST, error_msg)
 
@@ -5452,7 +5461,7 @@ class RepoGroupFolderPerm(APIView):
             return api_error(status.HTTP_400_BAD_REQUEST, error_msg)
 
         perm = request.data.get('permission', None)
-        if not perm or perm not in ('r', 'rw'):
+        if not perm or perm not in get_available_repo_perms():
             error_msg = 'permission invalid.'
             return api_error(status.HTTP_400_BAD_REQUEST, error_msg)
 
