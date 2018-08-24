@@ -817,6 +817,7 @@ def view_history_file_common(request, repo_id, ret_dict):
     ret_dict['current_commit'] = current_commit
     ret_dict['fileext'] = fileext
     ret_dict['raw_path'] = raw_path
+    ret_dict['can_download_file'] = parse_repo_perm(user_perm).can_download
     if not ret_dict.has_key('filetype'):
         ret_dict['filetype'] = filetype
 
@@ -1541,7 +1542,7 @@ def get_file_content_by_commit_and_path(request, repo_id, commit_id, path, file_
         return '', None
     else:
         if parse_repo_perm(check_folder_permission(
-                request, repo_id, '/')).can_download is True:
+                request, repo_id, '/')).can_preview is True:
             # Get a token to visit file
             token = seafile_api.get_fileserver_access_token(repo_id,
                     obj_id, 'view', request.user.username)

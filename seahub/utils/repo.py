@@ -31,6 +31,7 @@ def parse_repo_perm(perm):
         'can_download', 'can_upload',  # download/uplaod files/folders
         'can_edit_on_web',             # edit files on web
         'can_copy',                    # copy files/folders on web
+        'can_preview',                 # preview files on web
     ])
 
     RP.can_download = True if perm in [
@@ -43,7 +44,10 @@ def parse_repo_perm(perm):
     RP.can_copy = True if perm in [
         PERMISSION_READ, PERMISSION_READ_WRITE, PERMISSION_ADMIN,
     ] else False
-
+    RP.can_preview = True if perm in [
+        PERMISSION_READ, PERMISSION_READ_WRITE, PERMISSION_ADMIN,
+        PERMISSION_PREVIEW, PERMISSION_PREVIEW_EDIT
+    ] else False
     return RP
 
 def list_dir_by_path(cmmt, path):
