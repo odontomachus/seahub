@@ -811,8 +811,8 @@ def file_revisions(request, repo_id):
         logger.error(e)
         is_locked, locked_by_me = False, False
 
-    if seafile_api.check_permission_by_path(repo_id, path, username) != 'rw' or \
-        (is_locked and not locked_by_me):
+    repo_perm = seafile_api.check_permission_by_path(repo_id, path, username)
+    if repo_perm != 'rw' or (is_locked and not locked_by_me):
         can_revert_file = False
 
     # for 'go back'
@@ -826,6 +826,7 @@ def file_revisions(request, repo_id):
         'is_owner': is_owner,
         'can_compare': can_compare,
         'can_revert_file': can_revert_file,
+        'can_download_file': parse_repo_perm(repo_perm).can_download,
         'referer': referer,
         })
 

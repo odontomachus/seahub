@@ -443,6 +443,9 @@ def view_lib_file(request, repo_id, path):
     dl = request.GET.get('dl', '0') == '1'
     raw = request.GET.get('raw', '0') == '1'
     if dl or raw:
+        if parse_repo_perm(permission).can_download is False:
+            raise Http404
+
         operation = 'download' if dl else 'view'
         token = seafile_api.get_fileserver_access_token(repo_id,
                 file_id, operation, username, use_onetime=True)
@@ -468,6 +471,7 @@ def view_lib_file(request, repo_id, path):
         'file_perm': permission,
         'highlight_keyword': settings.HIGHLIGHT_KEYWORD,
         'enable_file_comment': settings.ENABLE_FILE_COMMENT,
+        'can_download_file': parse_repo_perm(permission).can_download,
     }
 
     # check whether file is starred
@@ -501,6 +505,12 @@ def view_lib_file(request, repo_id, path):
 
     return_dict['fileshare'] = fileshare,
     return_dict['file_shared_link'] = file_shared_link
+
+    if parse_repo_perm(permission).can_download and \
+       request.user.permissions.can_generate_share_link():
+        return_dict['can_share_file'] = True
+    else:
+        return_dict['can_share_file'] = False
 
     # fetch file contributors and latest contributor
     try:
@@ -578,7 +588,7 @@ def view_lib_file(request, repo_id, path):
             return_dict['file_content'] = file_content
 
         can_edit_file = True
-        if permission == 'r':
+        if parse_repo_perm(permission).can_edit_on_web is False:
             can_edit_file = False
         elif is_locked and not locked_by_me:
             can_edit_file = False
