@@ -54,16 +54,10 @@ define([
         },
 
         getIconTitle: function() {
-            var icon_title = '';
-            if (this.get('encrypted')) {
-                icon_title = gettext("Encrypted library");
-            } else if (this.get('permission') == "rw") {
-                icon_title = gettext("Read-Write library");
-            } else {
-                icon_title = gettext("Read-Only library");
-            }
-
-            return icon_title;
+            return Common.getLibIconTitle({
+                'encrypted': this.get('encrypted'),
+                'permission': this.get('permission')
+            });
         }
 
     });
