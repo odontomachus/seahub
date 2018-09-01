@@ -22,7 +22,8 @@ from seahub.invitations.models import Invitation
 from seahub.utils.repo import get_repo_shared_users
 from seahub.utils import normalize_cache_key
 from seahub.utils.timeutils import datetime_to_isoformat_timestr
-from seahub.constants import HASH_URLS 
+from seahub.constants import HASH_URLS
+from seahub.avatar.util import get_default_avatar_url, get_avatar_url
 
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
@@ -753,6 +754,360 @@ class UserNotification(models.Model):
         }
         return msg
 
+    ##### functions used in API
+    def format_file_uploaded_notice(self):
+        """
+
+        Arguments:
+        - `self`:
+        """
+        try:
+            d = json.loads(self.detail)
+        except Exception as e:
+            logger.error(e)
+            return _(u"Internal error")
+
+        notice = {}
+
+        filename = d['file_name']
+        repo_id = d['repo_id']
+        repo = seafile_api.get_repo(repo_id)
+        if repo:
+            if d['uploaded_to'] == '/':
+                # current upload path is '/'
+                file_path = '/' + filename
+                link = HASH_URLS["VIEW_COMMON_LIB_DIR"] % {'repo_id': repo_id, 'path': ''}
+                name = repo.name
+            else:
+                uploaded_to = d['uploaded_to'].rstrip('/')
+                file_path = uploaded_to + '/' + filename
+                link = HASH_URLS["VIEW_COMMON_LIB_DIR"] % {'repo_id': repo_id,
+                                              'path': uploaded_to.lstrip('/')}
+                name = os.path.basename(uploaded_to)
+
+            file_link = reverse('view_lib_file', args=[repo_id, file_path])
+
+            notice = {
+                'msg_type': self.msg_type,
+                'repo_exist': True,
+                'seen': self.seen,
+                'file_link': file_link,
+                'file_name': escape(filename),
+                'repo_link': link,
+                'repo_name': escape(name),
+                'time': datetime_to_isoformat_timestr(self.timestamp),
+                'avatar_url': get_default_avatar_url()
+                }
+        else:
+            notice = {
+                'msg_type': self.msg_type,
+                'seen': self.seen,
+                'repo_exist': False,
+                'file_name': escape(filename),
+                'time': datetime_to_isoformat_timestr(self.timestamp),              
+                'avatar_url': get_default_avatar_url()
+                }
+
+        return notice
+
+    def format_repo_share_notice(self):
+        """
+
+        Arguments:
+        - `self`:
+        """
+        try:
+            d = json.loads(self.detail)
+        except Exception as e:
+            logger.error(e)
+            return _(u"Internal error")
+
+        share_from = email2nickname(d['share_from'])
+        repo_id = d['repo_id']
+        path = d.get('path', '/')
+        org_id = d.get('org_id', None)
+        repo = None
+        try:
+            if path == '/':
+                repo = seafile_api.get_repo(repo_id)
+            else:
+                if org_id:
+                    owner = seafile_api.get_org_repo_owner(repo_id)
+                    repo = seafile_api.get_org_virtual_repo(
+                        org_id, repo_id, path, owner)
+                else:
+                    owner = seafile_api.get_repo_owner(repo_id)
+                    repo = seafile_api.get_virtual_repo(repo_id, path, owner)
+
+        except Exception as e:
+            logger.error(e)
+            return None
+
+        if repo is None:
+            self.delete()
+            return None
+
+        avatar_url = get_avatar_url(d['share_from'], size=32)
+
+        msg = {
+            'msg_type': self.msg_type,
+            'seen': self.seen,
+            'path': path,
+            'user': share_from,
+            'lib_url': HASH_URLS["VIEW_COMMON_LIB_DIR"] % {
+                'repo_id': repo.id,
+                'path': ''
+            },
+            'lib_name': repo.name,
+            'time': datetime_to_isoformat_timestr(self.timestamp),
+            'avatar_url': avatar_url,
+            'profile_url': reverse('user_profile', args=[d['share_from']])
+        }
+
+        return msg
+
+    def format_repo_share_to_group_notice(self):
+        """
+        Arguments:
+        - `self`:
+        """
+        try:
+            d = json.loads(self.detail)
+        except Exception as e:
+            logger.error(e)
+            return _(u"Internal error")
+
+        share_from = email2nickname(d['share_from'])
+        repo_id = d['repo_id']
+        group_id = d['group_id']
+        path = d.get('path', '/')
+        org_id = d.get('org_id', None)
+
+        repo = None
+        try:
+            group = ccnet_api.get_group(group_id)
+            if path == '/':
+                repo = seafile_api.get_repo(repo_id)
+            else:
+                if org_id:
+                    owner = seafile_api.get_org_repo_owner(repo_id)
+                    repo = seafile_api.get_org_virtual_repo(
+                        org_id, repo_id, path, owner)
+                else:
+                    owner = seafile_api.get_repo_owner(repo_id)
+                    repo = seafile_api.get_virtual_repo(repo_id, path, owner)
+        except Exception as e:
+            logger.error(e)
+            return None
+
+        if not repo or not group:
+            self.delete()
+            return None
+
+        avatar_url = get_avatar_url(d['share_from'], size=32)
+
+        notice = {
+            'msg_type': self.msg_type,
+            'seen': self.seen,
+            'path': path,
+            'user': share_from,
+            'lib_url': HASH_URLS["VIEW_COMMON_LIB_DIR"] % {
+                'repo_id': repo.id,
+                'path': ''
+            },
+            'lib_name': repo.name,
+            'group_url': HASH_URLS['GROUP_INFO'] % {'group_id': group.id},
+            'group_name': group.group_name,
+            'time': datetime_to_isoformat_timestr(self.timestamp),
+            'avatar_url': avatar_url,
+            'profile_url': reverse('user_profile', args=[d['share_from']])
+        }
+
+        return notice
+
+    def format_group_message_notice(self):
+        """
+
+        Arguments:
+        - `self`:
+        """
+        try:
+            d = self.group_message_detail_to_dict()
+        except self.InvalidDetailError as e:
+            logger.error(e)
+            return _(u"Internal error")
+
+        group_id = d.get('group_id')
+        group = ccnet_api.get_group(group_id)
+        if group is None:
+            self.delete()
+            return None
+
+        msg_from = d.get('msg_from')
+        message = d.get('message')
+
+        avatar_url = get_avatar_url(msg_from, size=32)
+
+        if msg_from is None:
+            msg = {
+                'msg_type': self.msg_type,
+                'seen': self.seen,
+                'href': HASH_URLS['GROUP_DISCUSS'] % {'group_id': group.id},
+                'group_name': group.group_name,
+                'message': message,
+                'time': datetime_to_isoformat_timestr(self.timestamp),
+                'avatar_url': get_default_avatar_url()
+            }
+        else:
+            msg = {
+                'msg_type': self.msg_type,
+                'time': datetime_to_isoformat_timestr(self.timestamp),
+                'seen': self.seen,
+                'href': HASH_URLS['GROUP_DISCUSS'] % {'group_id': group.id},
+                'user': escape(email2nickname(msg_from)),
+                'group_name': escape(group.group_name),
+                'message': message,
+                'avatar_url': avatar_url,
+                'profile_url': reverse('user_profile', args=[msg_from])
+            }
+
+        return msg
+
+    def format_group_join_request_notice(self):
+        """
+
+        Arguments:
+        - `self`:
+        """
+        try:
+            d = json.loads(self.detail)
+        except Exception as e:
+            logger.error(e)
+            return _(u"Internal error")
+
+        username = d['username']
+        group_id = d['group_id']
+        join_request_msg = d['join_request_msg']
+
+        group = ccnet_api.get_group(group_id)
+        if group is None:
+            self.delete()
+            return None
+
+        avatar_url = get_avatar_url(username, size=32)
+
+        msg = {
+            'msg_type': self.msg_type,
+            'time': datetime_to_isoformat_timestr(self.timestamp),
+            'seen': self.seen,
+            'user_profile': reverse('user_profile', args=[username]),
+            'username': username,
+            'href': HASH_URLS['GROUP_MEMBERS'] % {'group_id': group_id},
+            'group_name': escape(group.group_name),
+            'join_request_msg': escape(join_request_msg),
+            'avatar_url': avatar_url,
+            'profile_url': reverse('user_profile', args=[username])
+        }
+
+        return msg
+
+    def format_add_user_to_group_notice(self):
+        """
+        Arguments:
+        - `self`:
+        """
+        try:
+            d = json.loads(self.detail)
+        except Exception as e:
+            logger.error(e)
+            return _(u"Internal error")
+
+        group_staff = d['group_staff']
+        group_id = d['group_id']
+
+        group = ccnet_api.get_group(group_id)
+        if group is None:
+            self.delete()
+            return None
+
+        avatar_url = get_avatar_url(group_staff, size=32)
+
+        msg = {
+            'msg_type': self.msg_type,
+            'seen': self.seen,
+            'user_profile': reverse('user_profile', args=[group_staff]),
+            'group_staff': escape(email2nickname(group_staff)),
+            'href': HASH_URLS['GROUP_INFO'] % {'group_id': group_id},
+            'group_name': escape(group.group_name),
+            'time': datetime_to_isoformat_timestr(self.timestamp),
+            'avatar_url': avatar_url,
+            'profile_url': reverse('user_profile', args=[group_staff])
+        }
+
+        return msg
+
+    def format_file_comment_notice(self):
+        try:
+            d = json.loads(self.detail)
+        except Exception as e:
+            logger.error(e)
+            return _(u"Internal error")
+
+        repo_id = d['repo_id']
+        file_path = d['file_path']
+        author = d['author']
+
+        repo = seafile_api.get_repo(repo_id)
+        if repo is None or not seafile_api.get_file_id_by_path(repo.id,
+                                                               file_path):
+            self.delete()
+            return None
+
+        file_name = os.path.basename(file_path)
+        
+        avatar_url = get_avatar_url(author, size=32)
+
+        msg = {
+            'msg_type': self.msg_type,
+            'seen': self.seen,
+            'file_url': reverse('view_lib_file', args=[repo_id, file_path]),
+            'file_name': escape(file_name),
+            'author': escape(email2nickname(author)),
+            'time': datetime_to_isoformat_timestr(self.timestamp),
+            'avatar_url': avatar_url,
+            'profile_url': reverse('user_profile', args=[author])
+        }
+
+        return msg
+
+    def format_guest_invitation_accepted_notice(self):
+        try:
+            d = json.loads(self.detail)
+        except Exception as e:
+            logger.error(e)
+            return _(u"Internal error")
+
+        inv_id = d['invitation_id']
+        try:
+            inv = Invitation.objects.get(pk=inv_id)
+        except Invitation.DoesNotExist:
+            self.delete()
+            return
+
+        # Use same msg as in notice_email.html, so there will be only one msg
+        # in django.po.
+        msg = {
+            'msg_type': self.msg_type,
+            'seen': self.seen,
+            'user': inv.accepter,
+            'url_base': '',
+            'inv_url': settings.SITE_ROOT + '#invitations/',
+            'accept_time': datetime_to_isoformat_timestr(inv.accept_time),
+            'time': datetime_to_isoformat_timestr(self.timestamp),
+            'avatar_url': get_default_avatar_url()
+        }
+
+        return msg
 
 ########## handle signals
 from django.core.urlresolvers import reverse

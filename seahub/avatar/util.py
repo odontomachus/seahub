@@ -127,5 +127,12 @@ def get_avatar_file_storage():
             'size_column': 'size',
             }
         return get_storage_class(AVATAR_FILE_STORAGE)(options=dbs_options)
-    
-    
+
+
+def get_avatar_url(user, size=AVATAR_DEFAULT_SIZE):
+    avatar = get_primary_avatar(user, size=size)
+    if avatar:
+        url = avatar.avatar_url(size)
+        return url
+    else:
+        return get_default_avatar_url()
