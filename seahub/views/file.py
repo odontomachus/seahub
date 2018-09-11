@@ -18,6 +18,7 @@ import mimetypes
 import urlparse
 import datetime
 import hashlib
+import uuid
 
 from django.core import signing
 from django.core.cache import cache
@@ -665,13 +666,17 @@ def view_lib_file(request, repo_id, path):
 
         if ENABLE_ONLYOFFICE and fileext in ONLYOFFICE_FILE_EXTENSION:
 
+            if len(ONLYOFFICE_APIJS_URL) <= 1:
+                return_dict['err'] = _(u'Error when prepare OnlyOffice file preview page.')
+                return render(request, 'view_file_base.html', return_dict)
+
             if repo.is_virtual:
                 origin_repo_id = repo.origin_repo_id
                 origin_file_path = posixpath.join(repo.origin_path, path.strip('/'))
-                doc_key = hashlib.md5(force_bytes(origin_repo_id + \
-                        origin_file_path + file_id)).hexdigest()[:20]
+                oods_cache_key = hashlib.md5(force_bytes(origin_repo_id +
+                        origin_file_path)).hexdigest()[:20]
             else:
-                doc_key = hashlib.md5(force_bytes(repo_id + path + file_id)).hexdigest()[:20]
+                oods_cache_key = hashlib.md5(force_bytes(repo_id + path)).hexdigest()[:20]
 
             if fileext in ('xls', 'xlsx', 'ods', 'fods', 'csv'):
                 document_type = 'spreadsheet'
@@ -688,12 +693,21 @@ def view_lib_file(request, repo_id, path):
                 return render(request, 'view_file_base.html', return_dict)
 
             doc_url = gen_file_get_url(dl_token, filename)
-            doc_info = json.dumps({'repo_id': repo_id, 'file_path': path, 'username': username})
-            if len(ONLYOFFICE_APIJS_URL) <= 1:
-                return_dict['err'] = _(u'Error when prepare OnlyOffice file preview page.')
-                return render(request, 'view_file_base.html', return_dict)
 
-            cache.set("ONLYOFFICE_%s" % doc_key, doc_info, None)
+            # @TODO cache duration
+            oods_doc_key = uuid.uuid4().hexdigest
+            doc_info = json.dumps({'repo_id': repo_id, 'file_path': path,
+                                   'username': username, 'oods_doc_key': oods_doc_key})
+
+            # get cached oods_doc_key if there was already an entry
+            if not cache.add("ONLYOFFICE_%s" % oods_cache_key, doc_info, None):
+                try:
+                    doc_info = json.loads(cache.get("ONLYOFFICE_%s" % oods_cache_key))
+                except TypeError as e:
+                    # Cache can expire
+                    return_dict['err'] = "Expired OnlyOffice Session"
+                    return render(request, 'view_file_base.html', return_dict)
+                oods_doc_key = doc_info['oods_doc_key']
 
             can_edit = False
             if permission == 'rw' and \
@@ -717,7 +731,7 @@ def view_lib_file(request, repo_id, path):
                 'path': path,
                 'ONLYOFFICE_APIJS_URL': ONLYOFFICE_APIJS_URL,
                 'file_type': fileext,
-                'doc_key': doc_key,
+                'doc_key': oods_doc_key,
                 'doc_title': filename,
                 'doc_url': doc_url,
                 'document_type': document_type,
