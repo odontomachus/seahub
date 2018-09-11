@@ -3228,7 +3228,9 @@ class DirView(APIView):
 
         # permission check
         permission = check_folder_permission(request, repo_id, path)
-        if not permission:
+        if parse_repo_perm(permission).can_download is False and \
+           not is_web_request(request):
+            # preview only repo and this request does not came from web brower
             error_msg = 'Permission denied.'
             return api_error(status.HTTP_403_FORBIDDEN, error_msg)
 
@@ -4795,8 +4797,20 @@ class RepoTokensView(APIView):
             if not repo:
                 continue
 
-            if not check_folder_permission(request, repo.id, '/'):
-                continue
+            perm = check_folder_permission(request, repo.id, '/')
+            if not perm:
+                res = {
+                    'reason': 'no permission',
+                    'unsyncable_path': '/'
+                }
+                return Response(res, status=status.HTTP_403_FORBIDDEN)
+
+            if parse_repo_perm(perm).can_download is False:
+                res = {
+                    'reason': 'unsyncable share permission',
+                    'unsyncable_path': '/'
+                }
+                return Response(res, status=status.HTTP_403_FORBIDDEN)
 
             tokens[repo_id] = seafile_api.generate_repo_token(repo_id, request.user.username)
 
